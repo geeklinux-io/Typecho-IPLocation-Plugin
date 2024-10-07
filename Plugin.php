@@ -2,11 +2,11 @@
 /**
  * <strong style="color:red;">IP地址属地信息插件</strong>
  * 
- * 一个简单的插件，用于显示评论者的 IP 地址及其属地信息，使用 IP-INFO.CN 获取IP属地信息。
+ * 一个简单的插件，用于显示评论者的 IP 地址及其属地信息，支持不同的接口获取 IP 属地信息。
  *
  * @package IPLocation
  * @author 王浩宇
- * @version 1.1
+ * @version 1.2
  * @update: 2024/10/03
  * @link https://www.wanghaoyu.com.cn
  */
@@ -29,18 +29,28 @@ class IPLocation_Plugin implements Typecho_Plugin_Interface
         return _t('IPLocation 插件已禁用');
     }
 
-    public static function config(Typecho_Widget_Helper_Form $form) {}
+    public static function config(Typecho_Widget_Helper_Form $form)
+    {
+        $apiOptions = [
+            'ip-info.cn' => 'ip-info.cn (国外接口)',
+            'wanghaoyu.com.cn' => 'wanghaoyu.com.cn (国内接口)'
+        ];
+        $selectedApi = Typecho_Widget::widget('Widget_Options')->IPLocationApi ?? 'ip-info.cn';
+        
+        $form->addInput(new Typecho_Widget_Helper_Form_Element_Select('IPLocationApi', $apiOptions, $selectedApi, _t('选择IP查询接口')));
+    }
 
     public static function personalConfig(Typecho_Widget_Helper_Form $form) {}
 
     public static function getIPLocation($ip)
     {
         $cacheData = json_decode(file_get_contents(self::CACHE_FILE), true); 
-
+        $api = Typecho_Widget::widget('Widget_Options')->IPLocationApi ?? 'ip-info.cn';
+        
         if (isset($cacheData[$ip]) && (time() - $cacheData[$ip]['timestamp']) < self::CACHE_EXPIRATION) {
             return $cacheData[$ip]['data']; 
         } else {
-            $apiUrl = 'https://api.ip-info.cn/api/query?ip=' . $ip;
+            $apiUrl = ($api === 'wanghaoyu.com.cn') ? 'https://ip.wanghaoyu.com.cn/api/query?ip=' . $ip : 'https://api.ip-info.cn/api/query?ip=' . $ip;
             $response = @file_get_contents($apiUrl); 
             if ($response) {
                 $locationData = json_decode($response, true);
