@@ -1,0 +1,10 @@
+{
+    "ip-info": {
+        "name": "ip-info.cn (国外接口)",
+        "file": "api/ip-info.php"
+    },
+    "ip-info.cn": {
+        "name": "ip-info.cn (国内接口 速度快)",
+        "file": "api/ip-info.cn.php"
+    }
+}
