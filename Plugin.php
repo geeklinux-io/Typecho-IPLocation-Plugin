@@ -5,8 +5,8 @@
  * 一个简单的插件，用于显示评论者的 IP 地址及其属地信息，支持不同的接口获取 IP 属地信息。
  *
  * @package IPLocation
- * @version 1.3
- * @update: 2024/10/26
+ * @version 1.4
+ * @update: 2024/12/25
  * @author 王浩宇
  * @link https://www.wanghaoyu.com.cn
  */
@@ -22,7 +22,7 @@ class IPLocation_Plugin implements Typecho_Plugin_Interface
         if (!file_exists(self::CACHE_FILE)) {
             file_put_contents(self::CACHE_FILE, json_encode([]));
         }
-        return _t('IPLocation 插件已激活');
+        return _t('IPLocation 插件已激活 by wanghaoyu.com.cn');
     }
 
     public static function deactivate()
@@ -32,6 +32,28 @@ class IPLocation_Plugin implements Typecho_Plugin_Interface
 
     public static function config(Typecho_Widget_Helper_Form $form)
     {
+        echo '<style>
+            .typecho-page-title {
+                font-size: 24px;
+                font-weight: bold;
+                margin-bottom: 20px;
+            }
+            .typecho-option {
+                margin-bottom: 15px;
+            }
+            .typecho-option label {
+                font-weight: bold;
+            }
+            .typecho-option input[type="checkbox"] {
+                margin-right: 10px;
+            }
+            .typecho-option select {
+                padding: 5px;
+                border-radius: 4px;
+                border: 1px solid #ccc;
+            }
+        </style>';
+
         $apiOptions = self::loadApiOptions();
         $selectedApi = Typecho_Widget::widget('Widget_Options')->IPLocationApi ?? 'ip-info';
 
@@ -40,6 +62,37 @@ class IPLocation_Plugin implements Typecho_Plugin_Interface
             $apiOptions, 
             $selectedApi, 
             _t('选择IP查询接口')
+        ));
+
+        $form->addInput(new Typecho_Widget_Helper_Form_Element_Checkbox(
+            'EnableCache',
+            ['1' => _t('启用缓存')],
+            ['1'],
+            _t('缓存设置'),
+            _t('启用此选项可开启IP查询结果缓存功能，可以显著减少API请求，优化网站性能，提升用户体验')
+            .'<br>'
+            ._t('默认缓存到插件目录下的cache.json文件中，缓存时间为24小时。')
+            .'<br>'
+            ._t('如果需要清空缓存，请到插件目录下删除cache.json文件内容。')
+        ));
+
+        $form->addInput(new Typecho_Widget_Helper_Form_Element_Checkbox(
+            'ShowCountyLevel',
+            ['1' => _t('显示县级市地理位置')],
+            ['1'],
+            _t('地理位置设置'),
+            _t('启用此选项以显示县级市地理位置(国外不显示,非必要不建议开启)。')
+            .'<br>'
+            ._t('国外IP查询结果不显示县级市地理位置。')
+        ));
+
+        $form->addInput(new Typecho_Widget_Helper_Form_Element_Checkbox(
+            'ShowASNInfo',
+            ['1' => _t('显示运营商信息')],
+            ['1'],
+            _t('运营商信息设置'),
+            _t('启用此选项以显示运营商信息。')
+            
         ));
     }
 
@@ -66,26 +119,26 @@ class IPLocation_Plugin implements Typecho_Plugin_Interface
 
     public static function getIPLocation($ip)
     {
-        $cacheData = json_decode(file_get_contents(self::CACHE_FILE), true);
+        $enableCache = Typecho_Widget::widget('Widget_Options')->plugin('IPLocation')->EnableCache;
+        $cacheData = $enableCache ? json_decode(file_get_contents(self::CACHE_FILE), true) : [];
         $api = Typecho_Widget::widget('Widget_Options')->IPLocationApi ?? 'ip-info';
 
-        // 检查缓存是否存在且未过期
-        if (isset($cacheData[$ip]) && (time() - $cacheData[$ip]['timestamp']) < self::CACHE_EXPIRATION) {
+        if ($enableCache && isset($cacheData[$ip]) && (time() - $cacheData[$ip]['timestamp']) < self::CACHE_EXPIRATION) {
             return $cacheData[$ip]['data'];
         } else {
             $apiFile = self::loadApiFile($api);
             if ($apiFile && file_exists($apiFile)) {
                 $locationData = include $apiFile;
-                $result = $locationData($ip); // 调用 API 逻辑
+                $result = $locationData($ip);
 
-                if ($result) {
+                if ($result && $enableCache) {
                     $cacheData[$ip] = [
                         'timestamp' => time(),
                         'data' => $result,
                     ];
                     file_put_contents(self::CACHE_FILE, json_encode($cacheData, JSON_PRETTY_PRINT));
-                    return $result;
                 }
+                return $result;
             }
         }
 
@@ -95,17 +148,19 @@ class IPLocation_Plugin implements Typecho_Plugin_Interface
     public static function formatIPLocation($ip)
     {
         $locationData = self::getIPLocation($ip);
+        $showCountyLevel = Typecho_Widget::widget('Widget_Options')->plugin('IPLocation')->ShowCountyLevel;
+        $showASNInfo = Typecho_Widget::widget('Widget_Options')->plugin('IPLocation')->ShowASNInfo;
 
         if ($locationData) {
-            if (!empty($locationData['regions'])) {
-                $regions = array_slice($locationData['regions'], 0, 2);
-                $asnInfo = $locationData['asn']['info'] ?? $locationData['asn']['name'];
-                return 'IP属地：' . implode(' ', $regions) . ' ' . $asnInfo;
-            } elseif (!empty($locationData['country'])) {
-                $country = $locationData['country']['name'];
-                $asnInfo = $locationData['asn']['name'] ?? '';
-                return 'IP属地：' . $country . ($asnInfo ? ' ' . $asnInfo : '');
-            }
+            $regions = $showCountyLevel ? $locationData['regions'] : array_slice($locationData['regions'], 0, 2);
+            $asnInfo = $showASNInfo ? ($locationData['asn']['info'] ?? $locationData['asn']['name']) : '';
+
+            $countryCode = $locationData['country']['code'] ?? $locationData['registered_country']['code'] ?? '';
+            $countryName = $locationData['country']['name'] ?? $locationData['registered_country']['name'] ?? '未知';
+
+            $locationString = ($countryCode !== 'CN' ? $countryName . ' ' : '') . implode(' ', $regions);
+
+            return 'IP属地：' . $locationString . ($asnInfo ? ' ' . $asnInfo : '');
         }
 
         return 'IP属地：未知';
