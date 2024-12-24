@@ -62,6 +62,8 @@ class IPLocation_Plugin implements Typecho_Plugin_Interface
             $apiOptions, 
             $selectedApi, 
             _t('选择IP查询接口')
+            .'<br>'
+            ._t('接口状态监控显示页面：<a href="https://uptime.wanghaoyu.com.cn/status/all-status-page" target="_blank">状态监控</a>')
         ));
 
         $form->addInput(new Typecho_Widget_Helper_Form_Element_Checkbox(
@@ -81,7 +83,7 @@ class IPLocation_Plugin implements Typecho_Plugin_Interface
             ['1' => _t('显示县级市地理位置')],
             ['1'],
             _t('地理位置设置'),
-            _t('启用此选项以显示县级市地理位置(国外不显示,非必要不建议开启)。')
+            _t('启用此选项以显示县级市地理位置,无数据时自动留空。')
             .'<br>'
             ._t('国外IP查询结果不显示县级市地理位置。')
         ));
@@ -92,7 +94,7 @@ class IPLocation_Plugin implements Typecho_Plugin_Interface
             ['1'],
             _t('运营商信息设置'),
             _t('启用此选项以显示运营商信息。')
-            
+
         ));
     }
 
