@@ -155,14 +155,30 @@ class IPLocation_Plugin implements Typecho_Plugin_Interface
 
         if ($locationData) {
             $regions = $showCountyLevel ? $locationData['regions'] : array_slice($locationData['regions'], 0, 2);
-            $asnInfo = $showASNInfo ? ($locationData['asn']['info'] ?? $locationData['asn']['name']) : '';
+            
+            $asnInfo = '';
+            if ($showASNInfo && isset($locationData['asn']['info'])) {
+                if (is_array($locationData['asn']['info'])) {
+                    $asnInfo = $locationData['asn']['info']['name'] ?? '';
+                } else {
+                    $asnInfo = $locationData['asn']['info'];
+                }
+            }
 
             $countryCode = $locationData['country']['code'] ?? $locationData['registered_country']['code'] ?? '';
             $countryName = $locationData['country']['name'] ?? $locationData['registered_country']['name'] ?? '未知';
 
-            $locationString = ($countryCode !== 'CN' ? $countryName . ' ' : '') . implode(' ', $regions);
+            $locationString = implode(' ', $regions);
 
-            return 'IP属地：' . $locationString . ($asnInfo ? ' ' . $asnInfo : '');
+            if ($countryCode !== 'CN') {
+                $locationString = $countryName . ' ' . $locationString;
+            }
+
+            if ($asnInfo) {
+                $locationString .= ' ' . $asnInfo;
+            }
+
+            return 'IP属地：' . trim($locationString);
         }
 
         return 'IP属地：未知';
